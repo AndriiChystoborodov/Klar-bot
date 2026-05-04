@@ -3,17 +3,13 @@
 
 > *"Just tell it what you spent. Get honest analysis. No bank access required."*
 
-Klar is a Telegram bot that helps young professionals and students in expensive cities like Zürich track their spending without connecting a bank account. Log expenses by voice, text, or CSV — get AI-powered monthly analysis and saving tips.
+Klar is a Telegram bot that helps peoples track their spending without connecting a bank account. Log expenses by voice, text, or CSV — get AI-powered monthly analysis and saving tips.
 
 ---
 
 ## The Problem
 
 Logging expenses manually is too much friction. You open an app, tap through menus, fill in fields. Nobody does it consistently. And even when you do, the app shows you a pie chart with no advice and no answer to the real question: **where did my money actually go and what should I do about it?**
-
-- 60% of Gen Z live paycheck to paycheck *(Deloitte, 2024)*
-- Gen Z on average spends nearly 2x what they have in savings *(Bank of America Institute, 2025)*
-- Existing apps either require bank access, cost $15/month, or give generic tips that don't apply to your situation
 
 ---
 
@@ -35,7 +31,7 @@ Klar: ✅ Got it! 4.50 CHF · Food & Drink · Today
 | Feature | Description |
 |---------|-------------|
 | 🎤 Voice input | Say what you spent — Whisper transcribes it |
-| 💬 Text input | Any language (EN, DE, RU, UA) |
+| 💬 Text input | language (EN, DE, RU, UA) |
 | 📄 CSV upload | Export from your bank — bot categorizes every row |
 | 📊 /report | Monthly analysis with patterns + 3 saving tips |
 | 💬 Q&A | "How much on food this week?" — bot fetches and answers |
@@ -55,39 +51,15 @@ Klar: ✅ Got it! 4.50 CHF · Food & Drink · Today
 | Meta storage | SQLite (built-in Python) | User→sheet mapping, bans |
 | Deployment | Render (worker) | Free tier, never sleeps |
 
-**No LangChain.** Native Anthropic SDK — routing is deterministic, your code decides what to call.
-
----
-
-## Architecture
-
-```
-User sends message (voice / text / CSV)
-         ↓
-Security check (rate limit · ban check · SQLite)
-         ↓
-Detect message type (if/else — NOT LLM)
-    voice → Whisper API → text
-    CSV   → pandas → rows
-    text  → ready
-         ↓
-Claude Haiku — classify + parse (one call)
-returns: {intent: "expense|question|unclear", expenses: [...]}
-         ↓
-if expense  → validate → confirm → gspread write
-if question → sub-classify → fetch slice → Sonnet answer
-if /report  → fetch month → Sonnet analysis
-if unclear  → friendly fallback, no API called
-         ↓
-Reply to user via Telegram
-```
-
-**Key principle:** Your code orchestrates everything. LLM returns JSON only. It never calls APIs directly.
-
 ---
 
 ## Setup
 
+## For Users
+Just open Telegram and start chatting:
+👉 t.me/Klar_budget_bot
+
+## For Devs
 ### Prerequisites
 
 - Python 3.10+
@@ -172,31 +144,37 @@ python main.py
 ---
 
 ## Definition of Done
-
-- [x] Text + voice parsing works in EN/DE/RU/UA
-- [x] Google Sheets logging within 5 seconds
-- [x] /report generates monthly analysis + 3 saving tips
-- [x] CSV upload categorizes all rows
-- [x] Bot handles unexpected input gracefully (never crashes)
-- [x] Security: rate limiting + auto-ban
-- [x] All API keys in .env
-- [x] Deployed on Render (not just local)
+ Must Have ( MVP )
+- [ ] User sends text in any language (EN/DE/RU/UA) → expense parsed correctly and appears in Google Sheets
+- [ ] User sends voice message → transcribed by Whisper → parsed → logged
+- [ ] User uploads CSV bank export → all rows categorized and batch-written to Sheets ( Before logging, it checks for duplicates )
+- [ ] /report generates monthly analysis with spending patterns and concrete saving tips in CHF
+- [ ] Bot handles unexpected input gracefully (never crashes)
+- [ ] Security: rate limiting + auto-ban
 - [x] README with setup instructions
-- [x] Happy path works 10/10 times
-
+- [ ] Default account selection
+- [ ] Multi-account setup
 ---
 
 ## Roadmap
 
 | Priority | Feature |
 |----------|---------|
-| Should Have | Photo/receipt scanner (Claude Vision) |
+| Must Have | text and voice parsing |
+| Must Have | Google Sheets logging |
+| Must Have | Default account selection|
+| Must Have | Multi-account setup (Cash, ZKB, UBS, Crypto + custom)
+| Must Have | /report command |
+| Must Have | CSV upload |
+| Should Have | Photo/receipt scanner |
 | Should Have | Multi-language UI |
-| Could Have | Weekly /stats digest |
-| Could Have | Budget alerts |
+| Should Have | Transfer between accounts (/transfer) |
+| Should Have | Weekly /stats digest |
+| Should Have | /set the budget |
+| Could Have | monthly budget limits with alerts |
+| Could Have | AI suggestions how to set a budget wtih yr Income |
 | Won't Have (v2) | Apple Watch native app |
 | Won't Have (v2) | Bank integration |
 | Won't Have (v2) | Multi-user support |
 
----
 
