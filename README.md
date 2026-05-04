@@ -113,7 +113,7 @@ python main.py
 
 ## How to connect your Google Sheet
 
-1. Copy the template sheet: [click here](https://docs.google.com/spreadsheets/d/YOUR_TEMPLATE_ID/copy)
+1. Copy the template sheet: [click here](https://docs.google.com/spreadsheets/d/1gJL07L_oowC7PIFhm6xm3KasJIUOisUDzzE5RR_XFiQ/edit?gid=1962169306#gid=1962169306)
 2. Share it with the service account email (find it in `service_account.json` under `client_email`)
 3. Give **Editor** access
 4. Send the sheet link to the bot after `/start`
@@ -146,13 +146,13 @@ python main.py
 ## Definition of Done
  Must Have ( MVP )
 - [ ] User sends text in any language (EN/DE/RU/UA) → expense parsed correctly and appears in Google Sheets
-- [ ] User sends voice message → transcribed by Whisper → parsed → logged
+- [x] User sends voice message → transcribed by Whisper → parsed → logged
 - [ ] User uploads CSV bank export → all rows categorized and batch-written to Sheets ( Before logging, it checks for duplicates )
-- [ ] /report generates monthly analysis with spending patterns and concrete saving tips in CHF
+- [x] /report generates monthly analysis with spending patterns and concrete saving tips in CHF
 - [ ] Bot handles unexpected input gracefully (never crashes)
 - [ ] Security: rate limiting + auto-ban
 - [x] README with setup instructions
-- [ ] Default account selection
+- [x] Default account selection
 - [ ] Multi-account setup
 ---
 
