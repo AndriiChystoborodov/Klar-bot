@@ -1,0 +1,22 @@
+# Environment variables — NEVER commit these
+.env
+.env.local
+
+# Google service account — contains private keys
+service_account.json
+credentials.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# SQLite database
+*.db
+*.sqlite3
+
+# OS
+.DS_Store
