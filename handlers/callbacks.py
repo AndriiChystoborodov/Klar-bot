@@ -177,14 +177,24 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await query.edit_message_text("Nothing to edit.")
             return
         try:
-            sheets.update_row(
-                edit["sheet_id"],
-                edit["tab_name"],
-                edit["row_index"],
-                edit["field"],
-                edit["new_value"],
-            )
-            await query.edit_message_text("✅ Updated in your sheet.")
+            tab_names = edit.get("tab_names") or [edit.get("tab_name")]
+            found_any = False
+            for tab in tab_names:
+                found = sheets.find_and_update_row(
+                    edit["sheet_id"],
+                    tab,
+                    edit["match_date"],
+                    edit["match_amount"],
+                    edit["match_description"],
+                    edit["field"],
+                    edit["new_value"],
+                )
+                if found:
+                    found_any = True
+            if found_any:
+                await query.edit_message_text("✅ Updated in your sheet.")
+            else:
+                await query.edit_message_text("❌ Couldn't find that transaction in your sheet.")
         except Exception as e:
             await query.edit_message_text(f"❌ Failed to update: {e}")
 

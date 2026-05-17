@@ -27,3 +27,4 @@ CATEGORIES = [
 
 EXPENSES_TAB = "Expenses"
 INCOME_TAB = "Income"
+MONTHLY_OVERVIEW_TAB = "Monthly Overview"

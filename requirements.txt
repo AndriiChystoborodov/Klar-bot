@@ -3,4 +3,6 @@ openai
 groq
 gspread
 pandas
+openpyxl
+pdfplumber
 python-dotenv

@@ -1,11 +1,21 @@
 from datetime import datetime
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from config import ADMIN_TELEGRAM_ID
 from services import claude, database as db, security, sheets
 from services.database import PRESET_ACCOUNTS
+
+MAIN_KEYBOARD = ReplyKeyboardMarkup(
+    [
+        ["💳 Set Default Account", "💰 Set Budget"],
+        ["📊 My Report", "📈 My Stats"],
+        ["❓ How to use", "🏦 My Accounts"],
+    ],
+    resize_keyboard=True,
+    is_persistent=True,
+)
 
 
 async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -16,11 +26,14 @@ async def handle_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await update.message.reply_text(
         "Welcome to Klar! 💸\n\n"
         "I help you track expenses without connecting your bank.\n\n"
-        "To get started:\n"
-        "1. Create a Google Sheet and share it with the bot service account\n"
-        "   (Editor access)\n\n"
-        "2. Send me the link or ID of your sheet.\n\n"
-        "After that you can add accounts: /addaccount"
+        "To get started:\n\n"
+        "1️⃣ Copy this template to your Google Drive:\n"
+        "https://docs.google.com/spreadsheets/d/1aeEf8AhjQ-lBW5ciaLj3CTDjB_QFZEAFpxkeYu8K8Oc/edit\n\n"
+        "2️⃣ Share it with Editor access to:\n"
+        "<code>klar-bot@tg-bot-494907.iam.gserviceaccount.com</code>\n\n"
+        "3️⃣ Send me the link to your sheet.",
+        parse_mode="HTML",
+        reply_markup=MAIN_KEYBOARD,
     )
 
 
@@ -41,19 +54,19 @@ async def handle_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         "/setbudget 2000 — Set monthly budget\n"
         "/stats — Quick spending stats\n"
         "/help — Show this message\n\n"
-        "*Questions you can ask:*\n"
-        "• How much did I spend today?\n"
-        "• What did I spend on food this week?\n"
-        "• Am I on track with my budget?\n"
-        "• Give me saving tips",
+        "*Ask anything about your finances:*\n"
+        "Just type naturally — e.g. \"how much did I spend today?\", "
+        "\"show my food expenses this week\", \"did I overspend?\", "
+        "\"give me saving tips\", and more.",
         parse_mode="Markdown",
+        reply_markup=MAIN_KEYBOARD,
     )
 
 
 async def handle_addaccount(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
 
-    ok, reason = security.check_security(user_id)
+    ok, reason = security.check_security(user_id, count=False)
     if not ok:
         if reason == "banned":
             await update.message.reply_text("⛔ Your account has been suspended.")
@@ -115,7 +128,7 @@ async def _create_account(
 async def handle_accounts(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
 
-    ok, reason = security.check_security(user_id)
+    ok, reason = security.check_security(user_id, count=False)
     if not ok:
         if reason == "banned":
             await update.message.reply_text("⛔ Your account has been suspended.")
@@ -142,7 +155,7 @@ async def handle_accounts(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def handle_setdefault(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
 
-    ok, reason = security.check_security(user_id)
+    ok, reason = security.check_security(user_id, count=False)
     if not ok:
         if reason == "banned":
             await update.message.reply_text("⛔ Your account has been suspended.")
@@ -178,7 +191,7 @@ async def handle_setdefault(update: Update, context: ContextTypes.DEFAULT_TYPE) 
 async def handle_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
 
-    ok, reason = security.check_security(user_id)
+    ok, reason = security.check_security(user_id, count=False)
     if not ok:
         if reason == "banned":
             await update.message.reply_text("⛔ Your account has been suspended.")
@@ -197,13 +210,13 @@ async def handle_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     await update.message.reply_text(f"⏳ Generating report for *{account['name']}*...", parse_mode="Markdown")
 
     try:
-        rows = sheets.get_monthly_rows(sheet_id, account["name"])
+        rows, _ = sheets.get_monthly_rows(sheet_id, account["name"])
     except Exception as e:
         await update.message.reply_text(f"❌ Could not read your sheet: {e}")
         return
 
     if not rows:
-        await update.message.reply_text(f"No expenses found this month in *{account['name']}*.", parse_mode="Markdown")
+        await update.message.reply_text(f"No expenses found in *{account['name']}*.", parse_mode="Markdown")
         return
 
     summary = sheets.get_monthly_summary(sheet_id, account["name"])
@@ -235,7 +248,7 @@ async def handle_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 async def handle_budget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
 
-    ok, reason = security.check_security(user_id)
+    ok, reason = security.check_security(user_id, count=False)
     if not ok:
         if reason == "banned":
             await update.message.reply_text("⛔ Your account has been suspended.")
@@ -254,7 +267,7 @@ async def handle_budget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         return
 
     try:
-        rows = sheets.get_monthly_rows(sheet_id, account["name"])
+        rows, _ = sheets.get_monthly_rows(sheet_id, account["name"])
     except Exception as e:
         await update.message.reply_text(f"❌ Could not read your sheet: {e}")
         return
@@ -264,11 +277,29 @@ async def handle_budget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     pct = (spent / budget) * 100
     emoji = "✅" if remaining >= 0 else "❌"
 
+    # Per-category breakdown
+    cat_budgets = db.get_category_budgets(user_id)
+    by_cat: dict = {}
+    for r in rows:
+        cat = r.get("Category", "Other")
+        by_cat[cat] = round(by_cat.get(cat, 0) + float(r.get("Amount", 0)), 2)
+
+    cat_lines = ""
+    if cat_budgets:
+        lines = []
+        for cat, cat_limit in sorted(cat_budgets.items()):
+            cat_spent = by_cat.get(cat, 0)
+            cat_left = cat_limit - cat_spent
+            e = "✅" if cat_left >= 0 else "❌"
+            lines.append(f"{e} {cat}: {cat_spent:.0f} / {cat_limit:.0f} CHF")
+        cat_lines = "\n\n*Category budgets:*\n" + "\n".join(lines)
+
     await update.message.reply_text(
-        f"📊 *{account['name']}* budget\n\n"
-        f"Budget: {budget:.0f} CHF\n"
+        f"📊 *{account['name']}* — {datetime.now().strftime('%B %Y')}\n\n"
+        f"Monthly budget: {budget:.0f} CHF\n"
         f"💸 Spent: {spent:.0f} CHF ({pct:.0f}%)\n"
-        f"{emoji} {'Remaining' if remaining >= 0 else 'Over budget by'}: {abs(remaining):.0f} CHF",
+        f"{emoji} {'Remaining' if remaining >= 0 else 'Over budget by'}: {abs(remaining):.0f} CHF"
+        + cat_lines,
         parse_mode="Markdown",
     )
 
@@ -276,7 +307,7 @@ async def handle_budget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
 async def handle_setbudget(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
 
-    ok, reason = security.check_security(user_id)
+    ok, reason = security.check_security(user_id, count=False)
     if not ok:
         if reason == "banned":
             await update.message.reply_text("⛔ Your account has been suspended.")
@@ -296,7 +327,7 @@ async def handle_setbudget(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 async def handle_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user_id = update.effective_user.id
 
-    ok, reason = security.check_security(user_id)
+    ok, reason = security.check_security(user_id, count=False)
     if not ok:
         if reason == "banned":
             await update.message.reply_text("⛔ Your account has been suspended.")
@@ -312,7 +343,7 @@ async def handle_stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     try:
         today_rows = sheets.get_rows_for_period(sheet_id, account["name"], "today")
         week_rows = sheets.get_rows_for_period(sheet_id, account["name"], "week")
-        month_rows = sheets.get_monthly_rows(sheet_id, account["name"])
+        month_rows, _ = sheets.get_monthly_rows(sheet_id, account["name"])
     except Exception as e:
         await update.message.reply_text(f"❌ Could not read your sheet: {e}")
         return

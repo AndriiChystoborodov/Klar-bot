@@ -1,3 +1,4 @@
+import json
 import sqlite3
 from contextlib import contextmanager
 from datetime import datetime
@@ -7,13 +8,14 @@ DB_PATH = "klar.db"
 
 _CREATE_USERS = """
 CREATE TABLE IF NOT EXISTS users (
-    telegram_id     INTEGER PRIMARY KEY,
-    username        TEXT,
-    sheet_id        TEXT,
-    monthly_budget  REAL DEFAULT NULL,
-    is_banned       INTEGER DEFAULT 0,
-    banned_at       TEXT DEFAULT NULL,
-    created_at      TEXT DEFAULT CURRENT_TIMESTAMP
+    telegram_id      INTEGER PRIMARY KEY,
+    username         TEXT,
+    sheet_id         TEXT,
+    monthly_budget   REAL DEFAULT NULL,
+    category_budgets TEXT DEFAULT '{}',
+    is_banned        INTEGER DEFAULT 0,
+    banned_at        TEXT DEFAULT NULL,
+    created_at       TEXT DEFAULT CURRENT_TIMESTAMP
 );
 """
 
@@ -46,6 +48,11 @@ def init_db() -> None:
     with _conn() as con:
         con.execute(_CREATE_USERS)
         con.execute(_CREATE_ACCOUNTS)
+        # Migrate: add category_budgets column if it doesn't exist yet
+        try:
+            con.execute("ALTER TABLE users ADD COLUMN category_budgets TEXT DEFAULT '{}'")
+        except Exception:
+            pass
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +108,33 @@ def set_budget(telegram_id: int, amount: float) -> None:
             ON CONFLICT(telegram_id) DO UPDATE SET monthly_budget = excluded.monthly_budget
             """,
             (telegram_id, amount),
+        )
+
+
+def get_category_budgets(telegram_id: int) -> Dict[str, float]:
+    with _conn() as con:
+        row = con.execute(
+            "SELECT category_budgets FROM users WHERE telegram_id = ?", (telegram_id,)
+        ).fetchone()
+    if not row:
+        return {}
+    try:
+        return json.loads(row["category_budgets"] or "{}")
+    except (ValueError, TypeError):
+        return {}
+
+
+def set_category_budget(telegram_id: int, category: str, amount: float) -> None:
+    budgets = get_category_budgets(telegram_id)
+    budgets[category] = amount
+    with _conn() as con:
+        con.execute(
+            """
+            INSERT INTO users (telegram_id, category_budgets)
+            VALUES (?, ?)
+            ON CONFLICT(telegram_id) DO UPDATE SET category_budgets = excluded.category_budgets
+            """,
+            (telegram_id, json.dumps(budgets)),
         )
 
 
